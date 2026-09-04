@@ -7,6 +7,7 @@ import { ensureVisitorSession } from "@/lib/session";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
 import { StatusBadge } from "@/components/StatusBadge";
+import { markDelivered, markRead, getTickStatus } from "@/lib/messageStatus";
 import type { AppUser, Conversation, Message } from "@/lib/types";
 
 type ViewState = "loading" | "ready" | "denied" | "error";
@@ -95,6 +96,23 @@ export default function ChatRoomPage() {
         {
           event: "UPDATE",
           schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversation.id}`,
+        },
+        (payload) => {
+          // Sinkronkan perubahan delivered_at/read_at (mis. Sam sudah
+          // membaca pesan kita) supaya ceklis di bubble ikut berubah live.
+          const updated = payload.new as Message;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === updated.id ? updated : m))
+          );
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
           table: "conversations",
           filter: `id=eq.${conversation.id}`,
         },
@@ -110,6 +128,15 @@ export default function ChatRoomPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages.length]);
+
+  // Layar chat ini sedang terbuka/aktif -> anggap semua pesan dari Sam yang
+  // terlihat di sini sebagai delivered + read. Jalan tiap kali daftar pesan
+  // berubah (pesan baru masuk, atau load pertama kali).
+  useEffect(() => {
+    if (!conversation || !visitor || messages.length === 0) return;
+    markDelivered(conversation.id, visitor.id);
+    markRead(conversation.id, visitor.id);
+  }, [messages, conversation, visitor]);
 
   async function handleSend(text: string) {
     if (!conversation || !visitor) return;
@@ -193,6 +220,7 @@ export default function ChatRoomPage() {
             key={m.id}
             message={m}
             isMine={m.sender_id === visitor.id}
+            tickStatus={getTickStatus(m, visitor.id)}
           />
         ))}
         {conversation.status === "CLOSED" && (
