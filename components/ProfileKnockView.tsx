@@ -8,6 +8,7 @@ import Image from "next/image";
 import { Avatar } from "@/components/Avatar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { KnockButton } from "@/components/KnockButton";
+import { ensurePushSubscription } from "@/lib/push";
 import type { AppUser, Conversation, PublicProfile } from "@/lib/types";
 
 type ViewState = "loading" | "ready" | "not-found" | "error";
@@ -114,6 +115,25 @@ export function ProfileKnockView({
   async function handleKnock() {
     if (!profile || !visitor) return;
     setErrorMsg(null);
+
+    // WAJIB: izin notifikasi harus aktif SEBELUM keperluan dikirim, supaya
+    // visitor benar-benar bisa menerima push begitu Sam menyetujui. Kalau
+    // ditolak atau tidak didukung browser, pengiriman diblokir di sini.
+    const pushResult = await ensurePushSubscription(visitor.id);
+    if (!pushResult.ok) {
+      if (pushResult.reason === "denied") {
+        setErrorMsg(
+          "Izinkan notifikasi dulu, ya — supaya kamu langsung tahu saat Sam menyetujui ketukanmu."
+        );
+      } else if (pushResult.reason === "unsupported") {
+        setErrorMsg(
+          "Browser ini belum mendukung notifikasi. Coba pakai Chrome/Edge/Safari versi terbaru."
+        );
+      } else {
+        setErrorMsg("Gagal mengaktifkan notifikasi. Coba lagi sebentar lagi.");
+      }
+      return;
+    }
 
     const supabase = getSupabaseBrowserClient();
     const trimmedCode = accessCode.trim();
