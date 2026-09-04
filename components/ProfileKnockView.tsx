@@ -114,16 +114,47 @@ export function ProfileKnockView({
   async function handleKnock() {
     if (!profile || !visitor) return;
     setErrorMsg(null);
+
+    const supabase = getSupabaseBrowserClient();
+    const trimmedCode = accessCode.trim();
+    const basePayload = {
+      visitor_id: visitor.id,
+      owner_id: profile.owner_id,
+      keperluan: keperluan.trim() || null,
+    };
+
     try {
-      const supabase = getSupabaseBrowserClient();
+      if (trimmedCode) {
+        // Try to skip the approval queue: the conversations_insert_participant
+        // RLS policy only allows status APPROVED when access_code_used matches
+        // a valid, active, unexpired, not-yet-exhausted code for this owner.
+        // We can't validate the code ourselves ahead of time (RLS is the
+        // source of truth), so we attempt it and fall back to a normal
+        // PENDING knock if it's rejected.
+        const { data, error } = await supabase
+          .from("conversations")
+          .insert({
+            ...basePayload,
+            status: "APPROVED",
+            access_code_used: trimmedCode,
+          })
+          .select("*")
+          .single();
+
+        if (!error) {
+          setConversation(data as Conversation);
+          return;
+        }
+
+        // RLS violation (invalid/expired/exhausted code) — fall back to a
+        // regular knock below instead of surfacing an error, since an
+        // unrecognized code shouldn't block the visitor from knocking.
+        console.warn("Kode akses tidak valid, lanjut sebagai ketukan biasa.", error);
+      }
+
       const { data, error } = await supabase
         .from("conversations")
-        .insert({
-          visitor_id: visitor.id,
-          owner_id: profile.owner_id,
-          keperluan: keperluan.trim() || null,
-          access_code_used: accessCode.trim() || null,
-        })
+        .insert(basePayload)
         .select("*")
         .single();
 
