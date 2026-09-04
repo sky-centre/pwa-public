@@ -46,6 +46,8 @@ export interface Message {
   sender_id: string;
   isi_pesan: string;
   status_baca: boolean;
+  delivered_at: string | null;
+  read_at: string | null;
   created_at: string;
 }
 
