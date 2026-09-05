@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ensureVisitorSession } from "@/lib/session";
 import Image from "next/image";
-import { Avatar } from "@/components/Avatar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { KnockButton } from "@/components/KnockButton";
 import { ensurePushSubscription } from "@/lib/push";
 import type { AppUser, Conversation, PublicProfile } from "@/lib/types";
 
 type ViewState = "loading" | "ready" | "not-found" | "error";
+
+// Warna latar diambil langsung dari sampel piksel logo (sam-zone-hero.png),
+// supaya transisi antara logo dan background halaman terlihat menyatu.
+const ZONE_BG_COLOR = "#09090B";
 
 /**
  * Renders an owner's public profile + knock door flow.
@@ -35,9 +38,13 @@ export function ProfileKnockView({
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [visitor, setVisitor] = useState<AppUser | null>(null);
   const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [visitorName, setVisitorName] = useState("");
   const [accessCode, setAccessCode] = useState("");
   const [showAccessCode, setShowAccessCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const trimmedName = visitorName.trim();
+  const isNameValid = trimmedName.length > 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +120,8 @@ export function ProfileKnockView({
 
   async function handleKnock() {
     if (!profile || !visitor) return;
+    if (!isNameValid) return; // guard tambahan; tombol sudah disabled di UI
+
     setErrorMsg(null);
 
     // WAJIB: izin notifikasi harus aktif SEBELUM keperluan dikirim, supaya
@@ -140,6 +149,11 @@ export function ProfileKnockView({
       visitor_id: visitor.id,
       owner_id: profile.owner_id,
       keperluan: null,
+      // NOTE: kolom `visitor_name` diasumsikan ada di tabel `conversations`.
+      // Kalau belum ada, tambahkan kolomnya dulu (atau simpan nama ini ke
+      // tabel visitor/app_users lewat ensureVisitorSession) sebelum deploy,
+      // supaya insert di bawah tidak gagal karena kolom tak dikenal.
+      visitor_name: trimmedName,
     };
 
     try {
@@ -187,7 +201,10 @@ export function ProfileKnockView({
 
   if (state === "loading") {
     return (
-      <main className="zone-backdrop flex min-h-dvh items-center justify-center">
+      <main
+        className="zone-backdrop flex min-h-dvh items-center justify-center"
+        style={{ backgroundColor: ZONE_BG_COLOR }}
+      >
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-haze border-t-transparent" />
       </main>
     );
@@ -195,7 +212,10 @@ export function ProfileKnockView({
 
   if (state === "not-found") {
     return (
-      <main className="zone-backdrop flex min-h-dvh flex-col items-center justify-center gap-2 px-6 text-center safe-top safe-bottom">
+      <main
+        className="zone-backdrop flex min-h-dvh flex-col items-center justify-center gap-2 px-6 text-center safe-top safe-bottom"
+        style={{ backgroundColor: ZONE_BG_COLOR }}
+      >
         <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-void-line bg-void-raised">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
             <path
@@ -219,7 +239,10 @@ export function ProfileKnockView({
 
   if (state === "error") {
     return (
-      <main className="zone-backdrop flex min-h-dvh flex-col items-center justify-center gap-2 px-6 text-center safe-top safe-bottom">
+      <main
+        className="zone-backdrop flex min-h-dvh flex-col items-center justify-center gap-2 px-6 text-center safe-top safe-bottom"
+        style={{ backgroundColor: ZONE_BG_COLOR }}
+      >
         <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-void-line bg-void-raised">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
             <path
@@ -239,10 +262,13 @@ export function ProfileKnockView({
   if (!profile) return null;
 
   return (
-    <main className="zone-backdrop flex min-h-dvh flex-col px-6 safe-top safe-bottom">
+    <main
+      className="zone-backdrop flex min-h-dvh flex-col px-6 safe-top safe-bottom"
+      style={{ backgroundColor: ZONE_BG_COLOR }}
+    >
       <div className="flex flex-1 flex-col items-center justify-center">
         {showWelcome && (
-          <div className="mb-6 w-full max-w-[240px] animate-rise-in">
+          <div className="mb-6 w-full max-w-[340px] animate-rise-in">
             <Image
               src="/logo/sam-zone-hero.png"
               alt="Selamat datang di Sam-Zone — Public Chat"
@@ -257,13 +283,10 @@ export function ProfileKnockView({
           </div>
         )}
 
-        <Avatar
-          src={profile.foto_url}
-          alt={profile.username}
-          online={profile.status_online}
-          size={showWelcome ? 88 : 120}
-        />
-        <h1 className="mt-4 text-xl font-semibold text-ink">
+        {/* Avatar bulat dihapus — sebelumnya menampilkan icon fallback
+            generik saat foto_url kosong. Identitas Sam cukup diwakili
+            oleh logo + username di bawah ini. */}
+        <h1 className="mt-2 text-xl font-semibold text-ink">
           @{profile.username}
         </h1>
         {profile.deskripsi && (
@@ -293,6 +316,13 @@ export function ProfileKnockView({
             {/* Light seeping in under the door — the one structural flourish on this card */}
             <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-haze/70 to-transparent" />
 
+            <input
+              value={visitorName}
+              onChange={(e) => setVisitorName(e.target.value)}
+              placeholder="Nama kamu"
+              className="w-full rounded-2xl border border-void-line bg-void/70 px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:border-haze/60"
+            />
+
             {showAccessCode && (
               <input
                 value={accessCode}
@@ -306,7 +336,7 @@ export function ProfileKnockView({
               <p className="text-xs text-signal-rejected">{errorMsg}</p>
             )}
 
-            <KnockButton onKnock={handleKnock} />
+            <KnockButton onKnock={handleKnock} disabled={!isNameValid} />
 
             {!showAccessCode && (
               <button
