@@ -13,7 +13,9 @@ export function Avatar({
 }) {
   return (
     <div className="relative inline-block" style={{ width: size, height: size }}>
-      <div className="h-full w-full overflow-hidden rounded-full border-2 border-haze/60 bg-void-raised shadow-glow">
+      {/* Slow breathing glow — light behind a peephole, not a "pending" ping */}
+      <div className="absolute inset-0 animate-pulse rounded-t-full rounded-b-2xl bg-haze/25 blur-xl" />
+      <div className="relative h-full w-full overflow-hidden rounded-t-full rounded-b-2xl border-2 border-haze/60 bg-void-raised shadow-glow">
         {src ? (
           <Image
             src={src}
@@ -30,7 +32,7 @@ export function Avatar({
       </div>
       {online !== undefined && (
         <span
-          className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-void ${
+          className={`absolute bottom-1 right-0 h-4 w-4 rounded-full border-2 border-void ${
             online ? "bg-signal-approved" : "bg-void-line"
           }`}
           aria-label={online ? "Online" : "Offline"}
