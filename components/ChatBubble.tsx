@@ -1,12 +1,20 @@
 import type { Message } from "@/lib/types";
 import type { TickStatus } from "@/lib/messageStatus";
 
+// Warna centang "dibaca" — biru tosca terang, dipisah dari warna
+// sent/delivered (yang tetap pudar mengikuti warna teks bubble) supaya
+// status "sudah dibaca" langsung menonjol tanpa perlu dibaca teksnya.
+const READ_TICK_COLOR = "#2DD4BF";
+
 function StatusTicks({ status }: { status: TickStatus }) {
   if (!status) return null;
 
+  const isRead = status === "read";
+
   // sent/delivered: satu warna pudar (void/50), dibedakan lewat jumlah centang.
-  // read: penuh solid supaya jelas beda — "sudah dibaca".
-  const opacityClass = status === "read" ? "opacity-100" : "opacity-50";
+  // read: warna solid biru tosca terang — beda warna sekaligus beda opacity,
+  // supaya "sudah dibaca" jelas menonjol dari kedua status lainnya.
+  const opacityClass = isRead ? "opacity-100" : "opacity-50";
 
   return (
     <svg
@@ -14,7 +22,8 @@ function StatusTicks({ status }: { status: TickStatus }) {
       height="10"
       viewBox="0 0 15 10"
       fill="none"
-      className={`inline-block shrink-0 text-void ${opacityClass}`}
+      className={`inline-block shrink-0 ${isRead ? "" : "text-void"} ${opacityClass}`}
+      style={isRead ? { color: READ_TICK_COLOR } : undefined}
       aria-label={
         status === "sent"
           ? "Terkirim"
