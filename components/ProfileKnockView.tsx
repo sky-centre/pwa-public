@@ -35,7 +35,6 @@ export function ProfileKnockView({
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [visitor, setVisitor] = useState<AppUser | null>(null);
   const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [keperluan, setKeperluan] = useState("");
   const [accessCode, setAccessCode] = useState("");
   const [showAccessCode, setShowAccessCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -140,7 +139,7 @@ export function ProfileKnockView({
     const basePayload = {
       visitor_id: visitor.id,
       owner_id: profile.owner_id,
-      keperluan: keperluan.trim() || null,
+      keperluan: null,
     };
 
     try {
@@ -253,8 +252,7 @@ export function ProfileKnockView({
               className="h-auto w-full object-contain drop-shadow-[0_0_28px_rgba(56,189,248,0.28)]"
             />
             <p className="mt-1 text-center text-xs leading-relaxed text-ink-muted">
-              Tulis keperluanmu, ketuk pintu — chat terbuka otomatis begitu
-              Sam menyetujui.
+              Ketuk pintu — chat terbuka otomatis begitu Sam menyetujui.
             </p>
           </div>
         )}
@@ -295,28 +293,13 @@ export function ProfileKnockView({
             {/* Light seeping in under the door — the one structural flourish on this card */}
             <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-haze/70 to-transparent" />
 
-            <textarea
-              value={keperluan}
-              onChange={(e) => setKeperluan(e.target.value)}
-              placeholder="Tulis keperluanmu singkat (opsional) — membantu Sam memutuskan lebih cepat"
-              rows={2}
-              className="w-full resize-none rounded-2xl border border-void-line bg-void/70 px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:border-haze/60"
-            />
-
-            {showAccessCode ? (
+            {showAccessCode && (
               <input
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value)}
                 placeholder="Kode akses"
                 className="w-full rounded-2xl border border-void-line bg-void/70 px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:border-haze/60"
               />
-            ) : (
-              <button
-                onClick={() => setShowAccessCode(true)}
-                className="text-xs text-ink-faint underline underline-offset-2"
-              >
-                Punya kode akses?
-              </button>
             )}
 
             {errorMsg && (
@@ -324,6 +307,15 @@ export function ProfileKnockView({
             )}
 
             <KnockButton onKnock={handleKnock} />
+
+            {!showAccessCode && (
+              <button
+                onClick={() => setShowAccessCode(true)}
+                className="block w-full text-center text-xs text-ink-faint underline underline-offset-2"
+              >
+                Punya kode akses?
+              </button>
+            )}
           </div>
         )}
 
