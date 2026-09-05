@@ -42,6 +42,11 @@ export function ProfileKnockView({
   const [accessCode, setAccessCode] = useState("");
   const [showAccessCode, setShowAccessCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Peringatan non-blocking: browser sudah menolak izin notifikasi secara
+  // permanen (requestPermission tidak akan prompt ulang), tapi visitor masih
+  // boleh lanjut mengetuk pintu. Dipisah dari errorMsg supaya tetap tampil
+  // walau status conversation sudah berubah jadi PENDING/APPROVED.
+  const [pushWarning, setPushWarning] = useState<string | null>(null);
 
   const trimmedName = visitorName.trim();
   const isNameValid = trimmedName.length > 0;
@@ -124,23 +129,31 @@ export function ProfileKnockView({
 
     setErrorMsg(null);
 
-    // WAJIB: izin notifikasi harus aktif SEBELUM keperluan dikirim, supaya
-    // visitor benar-benar bisa menerima push begitu Sam menyetujui. Kalau
-    // ditolak atau tidak didukung browser, pengiriman diblokir di sini.
+    setPushWarning(null);
+
+    // Izin notifikasi diusahakan aktif SEBELUM keperluan dikirim, supaya
+    // visitor bisa menerima push begitu Sam menyetujui. Tapi kalau browser
+    // sudah menolaknya (status "denied" bersifat permanen — requestPermission
+    // tidak akan menampilkan prompt lagi sampai visitor mereset izin manual
+    // di pengaturan situs), kita tidak boleh mengunci visitor dari fitur
+    // utama hanya karena satu klik "Block" yang mungkin tidak disengaja.
+    // Jadi: tetap lanjut ketuk pintu, cukup beri peringatan non-blocking.
     const pushResult = await ensurePushSubscription(visitor.id);
     if (!pushResult.ok) {
       if (pushResult.reason === "denied") {
-        setErrorMsg(
-          "Izinkan notifikasi dulu, ya — supaya kamu langsung tahu saat Sam menyetujui ketukanmu."
+        setPushWarning(
+          "Notifikasi diblokir di browser kamu, jadi kamu mungkin tidak dapat pemberitahuan otomatis saat Sam menyetujui. Cek halaman ini sesekali, atau aktifkan notifikasi lewat pengaturan situs (ikon gembok/info di address bar) lalu ketuk ulang."
         );
+        // sengaja tidak return — lanjut proses knock di bawah
       } else if (pushResult.reason === "unsupported") {
         setErrorMsg(
           "Browser ini belum mendukung notifikasi. Coba pakai Chrome/Edge/Safari versi terbaru."
         );
+        return;
       } else {
         setErrorMsg("Gagal mengaktifkan notifikasi. Coba lagi sebentar lagi.");
+        return;
       }
-      return;
     }
 
     const supabase = getSupabaseBrowserClient();
@@ -313,6 +326,12 @@ export function ProfileKnockView({
           <div className="mt-5">
             <StatusBadge status={conversation.status} />
           </div>
+        )}
+
+        {pushWarning && (
+          <p className="mt-3 max-w-xs text-center text-xs text-signal-rejected">
+            {pushWarning}
+          </p>
         )}
       </div>
 
