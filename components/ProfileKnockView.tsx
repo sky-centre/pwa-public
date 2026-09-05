@@ -7,7 +7,11 @@ import { ensureVisitorSession } from "@/lib/session";
 import Image from "next/image";
 import { StatusBadge } from "@/components/StatusBadge";
 import { KnockButton } from "@/components/KnockButton";
-import { ensurePushSubscription } from "@/lib/push";
+import { NotificationPermissionHelp } from "@/components/NotificationPermissionHelp";
+import {
+  ensurePushSubscription,
+  getNotificationPermissionState,
+} from "@/lib/push";
 import type { AppUser, Conversation, PublicProfile } from "@/lib/types";
 
 type ViewState = "loading" | "ready" | "not-found" | "error";
@@ -47,6 +51,56 @@ export function ProfileKnockView({
   // boleh lanjut mengetuk pintu. Dipisah dari errorMsg supaya tetap tampil
   // walau status conversation sudah berubah jadi PENDING/APPROVED.
   const [pushWarning, setPushWarning] = useState<string | null>(null);
+
+  // Tombol notifikasi mandiri di halaman awal — terpisah dari alur ketuk
+  // pintu, supaya visitor bisa mengaktifkan notifikasi kapan saja tanpa
+  // harus mengisi nama & mengetuk dulu.
+  // notifStatus mulai dari null (belum dicek) supaya render pertama sama
+  // persis antara server & client, lalu diisi di useEffect setelah mount
+  // (Notification API hanya ada di window, tidak ada saat SSR).
+  const [notifStatus, setNotifStatus] = useState<
+    "granted" | "denied" | "prompt" | "unsupported" | null
+  >(null);
+  const [notifBusy, setNotifBusy] = useState(false);
+  const [notifMessage, setNotifMessage] = useState<string | null>(null);
+  const [showNotifHelp, setShowNotifHelp] = useState(false);
+
+  useEffect(() => {
+    setNotifStatus(getNotificationPermissionState());
+  }, []);
+
+  async function handleEnableNotifications() {
+    if (!visitor || notifBusy) return;
+
+    // Sudah pernah ditolak sebelumnya -> requestPermission() tidak akan
+    // menampilkan dialog apa pun (lihat catatan di lib/push.ts). Arahkan
+    // langsung ke instruksi manual alih-alih menekan tombol tanpa efek.
+    if (notifStatus === "denied") {
+      setShowNotifHelp(true);
+      return;
+    }
+
+    setNotifBusy(true);
+    setNotifMessage(null);
+
+    const result = await ensurePushSubscription(visitor.id);
+    setNotifBusy(false);
+
+    if (result.ok) {
+      setNotifStatus("granted");
+      return;
+    }
+
+    if (result.reason === "denied" || result.reason === "blocked") {
+      setNotifStatus("denied");
+      setShowNotifHelp(true);
+    } else if (result.reason === "unsupported") {
+      setNotifStatus("unsupported");
+      setNotifMessage("Browser ini belum mendukung notifikasi.");
+    } else {
+      setNotifMessage("Gagal mengaktifkan notifikasi. Coba lagi sebentar lagi.");
+    }
+  }
 
   const trimmedName = visitorName.trim();
   const isNameValid = trimmedName.length > 0;
@@ -322,6 +376,32 @@ export function ProfileKnockView({
           {profile.status_online ? "Sedang berjaga" : "Sedang tidak ada"}
         </span>
 
+        {visitor && notifStatus !== "unsupported" && (
+          <button
+            onClick={handleEnableNotifications}
+            disabled={notifBusy || notifStatus === "granted" || notifStatus === null}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-void-line bg-void-raised px-3.5 py-1.5 text-xs font-medium text-ink-muted transition active:scale-[0.97] disabled:active:scale-100"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 3C9 3 7 5.5 7 8.5V11H6a1 1 0 00-1 1v7a2 2 0 002 2h10a2 2 0 002-2v-7a1 1 0 00-1-1h-1V8.5C17 5.5 15 3 12 3zm3 8H9V8.5C9 6.6 10.3 5 12 5s3 1.6 3 3.5V11z"
+                fill={notifStatus === "granted" ? "#34D399" : "#F5B942"}
+              />
+            </svg>
+            {notifStatus === "granted"
+              ? "Notifikasi aktif"
+              : notifBusy
+                ? "Memproses…"
+                : "Aktifkan Notifikasi"}
+          </button>
+        )}
+
+        {notifMessage && (
+          <p className="mt-2 max-w-xs text-center text-xs text-signal-rejected">
+            {notifMessage}
+          </p>
+        )}
+
         {conversation && (
           <div className="mt-5">
             <StatusBadge status={conversation.status} />
@@ -403,6 +483,16 @@ export function ProfileKnockView({
           </p>
         )}
       </div>
+
+      {showNotifHelp && (
+        <NotificationPermissionHelp
+          onClose={() => setShowNotifHelp(false)}
+          onRetry={() => {
+            setShowNotifHelp(false);
+            handleEnableNotifications();
+          }}
+        />
+      )}
     </main>
   );
 }
