@@ -21,6 +21,56 @@ type ViewState = "loading" | "ready" | "not-found" | "error";
 const ZONE_BG_COLOR = "#09090B";
 
 /**
+ * Info banner diam (bukan marquee) dipakai untuk semua teks status/peringatan
+ * di halaman ini, supaya konsisten: ikon + border + tint warna sesuai tone,
+ * bukan sekadar <p> berwarna yang ditempel begitu saja.
+ * - "danger": kegagalan yang perlu perhatian (errorMsg)
+ * - "warning": peringatan non-blocking (pushWarning, notifMessage)
+ * - "neutral": info status yang netral (PENDING/REJECTED/CLOSED)
+ */
+function InfoBanner({
+  tone,
+  children,
+}: {
+  tone: "danger" | "warning" | "neutral";
+  children: React.ReactNode;
+}) {
+  const toneClasses =
+    tone === "danger"
+      ? "border-signal-rejected/25 bg-signal-rejected/10 text-signal-rejected"
+      : tone === "warning"
+        ? "border-void-line bg-void-raised/70 text-ink-muted"
+        : "border-void-line bg-void-raised/50 text-ink-muted";
+
+  const iconColor =
+    tone === "danger" ? "#E9727A" : tone === "warning" ? "#F5B942" : "#6B7280";
+
+  return (
+    <div
+      className={`mt-3 flex items-start gap-2 rounded-2xl border px-3.5 py-2.5 text-left text-xs leading-relaxed ${toneClasses}`}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        className="mt-0.5 flex-shrink-0"
+      >
+        <circle cx="12" cy="12" r="9" stroke={iconColor} strokeWidth="1.8" />
+        <path
+          d="M12 8v5"
+          stroke={iconColor}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <circle cx="12" cy="16" r="0.9" fill={iconColor} />
+      </svg>
+      <span>{children}</span>
+    </div>
+  );
+}
+
+/**
  * Renders an owner's public profile + knock door flow.
  * - Pass `username` when the route is explicit (/[username]).
  * - Omit it to auto-load the single owner profile — used at "/" so the
@@ -46,10 +96,11 @@ export function ProfileKnockView({
   const [accessCode, setAccessCode] = useState("");
   const [showAccessCode, setShowAccessCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Peringatan non-blocking: browser sudah menolak izin notifikasi secara
-  // permanen (requestPermission tidak akan prompt ulang), tapi visitor masih
-  // boleh lanjut mengetuk pintu. Dipisah dari errorMsg supaya tetap tampil
-  // walau status conversation sudah berubah jadi PENDING/APPROVED.
+  // Peringatan non-blocking terkait notifikasi (browser tidak mendukung,
+  // izin ditolak, atau gagal subscribe karena alasan lain). Notifikasi
+  // bersifat best-effort — visitor tetap boleh lanjut mengetuk pintu apa
+  // pun hasilnya, jadi ini dipisah dari errorMsg (yang berarti gagal total
+  // dan menghentikan alur) dan tidak pernah dipakai untuk menahan handleKnock.
   const [pushWarning, setPushWarning] = useState<string | null>(null);
 
   // Tombol notifikasi mandiri di halaman awal — terpisah dari alur ketuk
@@ -182,32 +233,29 @@ export function ProfileKnockView({
     if (!isNameValid) return; // guard tambahan; tombol sudah disabled di UI
 
     setErrorMsg(null);
-
     setPushWarning(null);
 
-    // Izin notifikasi diusahakan aktif SEBELUM keperluan dikirim, supaya
-    // visitor bisa menerima push begitu Sam menyetujui. Tapi kalau browser
-    // sudah menolaknya (status "denied" bersifat permanen — requestPermission
-    // tidak akan menampilkan prompt lagi sampai visitor mereset izin manual
-    // di pengaturan situs), kita tidak boleh mengunci visitor dari fitur
-    // utama hanya karena satu klik "Block" yang mungkin tidak disengaja.
-    // Jadi: tetap lanjut ketuk pintu, cukup beri peringatan non-blocking.
+    // Notifikasi diusahakan aktif SEBELUM keperluan dikirim, supaya visitor
+    // bisa menerima push begitu Sam menyetujui. Tapi ini best-effort: browser
+    // tidak mendukung, izin ditolak, atau kegagalan subscribe lainnya TIDAK
+    // BOLEH menahan visitor dari mengetuk pintu — cukup tampilkan peringatan
+    // non-blocking dan tetap lanjut ke proses insert conversation di bawah.
     const pushResult = await ensurePushSubscription(visitor.id);
     if (!pushResult.ok) {
-      if (pushResult.reason === "denied") {
+      if (pushResult.reason === "unsupported") {
+        setPushWarning(
+          "Browser ini belum mendukung notifikasi otomatis. Kamu tetap bisa mengetuk pintu — cek halaman ini sesekali untuk melihat balasan Sam."
+        );
+      } else if (pushResult.reason === "denied") {
         setPushWarning(
           "Notifikasi diblokir di browser kamu, jadi kamu mungkin tidak dapat pemberitahuan otomatis saat Sam menyetujui. Cek halaman ini sesekali, atau aktifkan notifikasi lewat pengaturan situs (ikon gembok/info di address bar) lalu ketuk ulang."
         );
-        // sengaja tidak return — lanjut proses knock di bawah
-      } else if (pushResult.reason === "unsupported") {
-        setErrorMsg(
-          "Browser ini belum mendukung notifikasi. Coba pakai Chrome/Edge/Safari versi terbaru."
-        );
-        return;
       } else {
-        setErrorMsg("Gagal mengaktifkan notifikasi. Coba lagi sebentar lagi.");
-        return;
+        setPushWarning(
+          "Notifikasi push belum aktif untuk perangkat ini, tapi kamu tetap bisa lanjut mengetuk pintu."
+        );
       }
+      // sengaja tidak return di kondisi apa pun di atas.
     }
 
     const supabase = getSupabaseBrowserClient();
@@ -396,11 +444,7 @@ export function ProfileKnockView({
           </button>
         )}
 
-        {notifMessage && (
-          <p className="mt-2 max-w-xs text-center text-xs text-signal-rejected">
-            {notifMessage}
-          </p>
-        )}
+        {notifMessage && <InfoBanner tone="warning">{notifMessage}</InfoBanner>}
 
         {conversation && (
           <div className="mt-5">
@@ -408,11 +452,7 @@ export function ProfileKnockView({
           </div>
         )}
 
-        {pushWarning && (
-          <p className="mt-3 max-w-xs text-center text-xs text-signal-rejected">
-            {pushWarning}
-          </p>
-        )}
+        {pushWarning && <InfoBanner tone="warning">{pushWarning}</InfoBanner>}
       </div>
 
       <div className="pb-8">
@@ -437,9 +477,7 @@ export function ProfileKnockView({
               />
             )}
 
-            {errorMsg && (
-              <p className="text-xs text-signal-rejected">{errorMsg}</p>
-            )}
+            {errorMsg && <InfoBanner tone="danger">{errorMsg}</InfoBanner>}
 
             <KnockButton onKnock={handleKnock} disabled={!isNameValid} />
 
@@ -455,9 +493,9 @@ export function ProfileKnockView({
         )}
 
         {conversation?.status === "PENDING" && (
-          <p className="pt-4 text-center text-xs text-ink-faint">
+          <InfoBanner tone="neutral">
             Sam akan meninjau ketukanmu. Halaman ini akan otomatis terupdate.
-          </p>
+          </InfoBanner>
         )}
 
         {conversation?.status === "APPROVED" && (
@@ -472,15 +510,15 @@ export function ProfileKnockView({
         )}
 
         {conversation?.status === "REJECTED" && (
-          <p className="text-center text-sm text-ink-muted">
+          <InfoBanner tone="neutral">
             Ketukanmu belum disetujui kali ini.
-          </p>
+          </InfoBanner>
         )}
 
         {conversation?.status === "CLOSED" && (
-          <p className="text-center text-sm text-ink-muted">
+          <InfoBanner tone="neutral">
             Percakapan ini sudah ditutup oleh Sam.
-          </p>
+          </InfoBanner>
         )}
       </div>
 
