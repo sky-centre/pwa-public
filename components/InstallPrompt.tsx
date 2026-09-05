@@ -1,46 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+import { useInstallPrompt } from "@/lib/useInstallPrompt";
 
 const DISMISSED_KEY = "sky-zone-install-dismissed";
 
 export function InstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
-    null
-  );
-  const [visible, setVisible] = useState(false);
+  const { canInstall, isStandalone, promptInstall } = useInstallPrompt();
+  // Mulai dari true (tersembunyi) supaya render pertama sama antara server &
+  // client — localStorage cuma ada di browser, dibaca setelah mount.
+  const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (localStorage.getItem(DISMISSED_KEY)) return;
-
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-      setVisible(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    setDismissed(!!localStorage.getItem(DISMISSED_KEY));
   }, []);
 
-  if (!visible || !deferred) return null;
-
-  async function install() {
-    if (!deferred) return;
-    await deferred.prompt();
-    await deferred.userChoice;
-    setVisible(false);
-  }
+  const visible = canInstall && !isStandalone && !dismissed;
+  if (!visible) return null;
 
   function dismiss() {
     localStorage.setItem(DISMISSED_KEY, "1");
-    setVisible(false);
+    setDismissed(true);
+  }
+
+  async function install() {
+    await promptInstall();
+    // Kalau outcome "dismissed" (user menutup dialog native), banner ini
+    // akan hilang sendiri di render berikutnya karena canInstall jadi false
+    // hanya saat "accepted" — kalau ditolak, deferred tetap ada dan banner
+    // tetap tampil supaya user bisa coba lagi kapan saja.
   }
 
   return (
