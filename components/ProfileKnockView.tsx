@@ -149,14 +149,20 @@ export function ProfileKnockView({
       visitor_id: visitor.id,
       owner_id: profile.owner_id,
       keperluan: null,
-      // NOTE: kolom `visitor_name` diasumsikan ada di tabel `conversations`.
-      // Kalau belum ada, tambahkan kolomnya dulu (atau simpan nama ini ke
-      // tabel visitor/app_users lewat ensureVisitorSession) sebelum deploy,
-      // supaya insert di bawah tidak gagal karena kolom tak dikenal.
-      visitor_name: trimmedName,
     };
 
     try {
+      // Simpan nama ke kolom `users.nama` yang sudah ada di skema —
+      // tidak perlu migrasi/kolom baru. Dilakukan sebelum insert
+      // conversation supaya nama visitor sudah terekam begitu Sam
+      // melihat notifikasi ketukan.
+      const { error: nameError } = await supabase
+        .from("users")
+        .update({ nama: trimmedName })
+        .eq("id", visitor.id);
+
+      if (nameError) throw nameError;
+
       if (trimmedCode) {
         // Try to skip the approval queue: the conversations_insert_participant
         // RLS policy only allows status APPROVED when access_code_used matches
