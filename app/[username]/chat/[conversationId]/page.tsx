@@ -2,15 +2,103 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Space_Grotesk } from "next/font/google";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ensureVisitorSession } from "@/lib/session";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
 import { StatusBadge } from "@/components/StatusBadge";
+import { NotificationPermissionHelp } from "@/components/NotificationPermissionHelp";
+import {
+  ensurePushSubscription,
+  getNotificationPermissionState,
+} from "@/lib/push";
 import { markDelivered, markRead, getTickStatus } from "@/lib/messageStatus";
 import type { AppUser, Conversation, Message } from "@/lib/types";
 
 type ViewState = "loading" | "ready" | "denied" | "error";
+
+// Font berbeda khusus untuk handle "@username" di header — sengaja dipisah
+// dari font utama app supaya identitas Sam menonjol di titik yang paling
+// sering dilihat (header selalu ada di layar).
+const handleFont = Space_Grotesk({ subsets: ["latin"], weight: ["700"] });
+
+// Sama dengan READ_TICK_COLOR di ChatBubble.tsx — dipakai lagi di sini
+// supaya biru tosca jadi warna aksen yang konsisten, bukan warna sekali pakai.
+const ACCENT_TURQUOISE = "#2DD4BF";
+
+type NotifStatus = "granted" | "denied" | "prompt" | "unsupported" | null;
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+function BellIcon({ status }: { status: NotifStatus }) {
+  const color = status === "granted" ? "#34D399" : "#F5B942";
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 3C9 3 7 5.5 7 8.5V11H6a1 1 0 00-1 1v7a2 2 0 002 2h10a2 2 0 002-2v-7a1 1 0 00-1-1h-1V8.5C17 5.5 15 3 12 3zm3 8H9V8.5C9 6.6 10.3 5 12 5s3 1.6 3 3.5V11z"
+        fill={color}
+      />
+    </svg>
+  );
+}
+
+function InstallIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="3.5" width="16" height="13" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M9 20h6M12 16v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M9 9l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 5.5v6.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Instruksi manual untuk "install ke perangkat" saat `beforeinstallprompt`
+ * tidak tersedia — ini SELALU kasusnya di Safari/iOS (event itu memang
+ * tidak pernah ada di sana), dan juga muncul kalau app sudah pernah
+ * ter-install. Modal ini menggantikan tombol yang diam saja tanpa efek.
+ */
+function InstallHelpModal({
+  isIOS,
+  onClose,
+}: {
+  isIOS: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
+      <div className="w-full max-w-sm rounded-t-3xl border border-void-line bg-void-raised p-5 sm:rounded-3xl">
+        <p className="text-sm font-semibold text-ink">Install ke perangkat</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+          {isIOS ? (
+            <>
+              Di Safari: tap ikon <strong>Share</strong> (kotak dengan panah ke
+              atas) di bar bawah, lalu pilih{" "}
+              <strong>&quot;Add to Home Screen&quot;</strong>.
+            </>
+          ) : (
+            <>
+              Buka menu browser (biasanya ikon titik tiga di pojok), lalu
+              cari opsi <strong>&quot;Install app&quot;</strong> atau{" "}
+              <strong>&quot;Add to Home screen&quot;</strong>.
+            </>
+          )}
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-4 w-full rounded-xl border border-void-line py-2.5 text-sm font-medium text-ink-muted active:bg-void"
+        >
+          Mengerti
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function ChatRoomPage() {
   const { username, conversationId } = useParams<{
@@ -24,6 +112,81 @@ export default function ChatRoomPage() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // --- Notifikasi (tombol di header) ---
+  const [notifStatus, setNotifStatus] = useState<NotifStatus>(null);
+  const [notifBusy, setNotifBusy] = useState(false);
+  const [showNotifHelp, setShowNotifHelp] = useState(false);
+
+  // --- Install ke perangkat (tombol di header) ---
+  const [installEvent, setInstallEvent] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    setNotifStatus(getNotificationPermissionState());
+
+    setIsStandalone(
+      window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true
+    );
+    setIsIOS(/iphone|ipad|ipod/i.test(window.navigator.userAgent));
+
+    function onBeforeInstallPrompt(e: Event) {
+      e.preventDefault();
+      setInstallEvent(e as BeforeInstallPromptEvent);
+    }
+    function onAppInstalled() {
+      setInstallEvent(null);
+      setIsStandalone(true);
+    }
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
+
+  async function handleEnableNotifications() {
+    if (!visitor || notifBusy) return;
+
+    if (notifStatus === "denied") {
+      setShowNotifHelp(true);
+      return;
+    }
+
+    setNotifBusy(true);
+    const result = await ensurePushSubscription(visitor.id);
+    setNotifBusy(false);
+
+    if (result.ok) {
+      setNotifStatus("granted");
+      return;
+    }
+    if (result.reason === "denied" || result.reason === "blocked") {
+      setNotifStatus("denied");
+      setShowNotifHelp(true);
+    } else if (result.reason === "unsupported") {
+      setNotifStatus("unsupported");
+    }
+    // kegagalan lain: diam saja di sini, tombol tetap bisa dicoba ulang.
+  }
+
+  async function handleInstallTap() {
+    if (!installEvent) {
+      setShowInstallHelp(true);
+      return;
+    }
+    await installEvent.prompt();
+    const choice = await installEvent.userChoice;
+    if (choice.outcome === "accepted") {
+      setInstallEvent(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -184,26 +347,56 @@ export default function ChatRoomPage() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-void">
-      <header className="safe-top flex items-center justify-between border-b border-void-line px-4 pb-3">
-        <button
-          onClick={() => router.push(`/${username}`)}
-          aria-label="Kembali"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted active:bg-void-raised"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M15 18l-6-6 6-6"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <div className="text-center">
-          <p className="text-sm font-semibold text-ink">@{username}</p>
+      <header className="safe-top border-b border-void-line px-4 pb-3">
+        <div className="flex items-center justify-between pt-1">
+          <button
+            onClick={() => router.push(`/${username}`)}
+            aria-label="Kembali"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted active:bg-void-raised"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 18l-6-6 6-6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleEnableNotifications}
+              disabled={notifBusy || notifStatus === "granted" || notifStatus === "unsupported"}
+              aria-label={
+                notifStatus === "granted" ? "Notifikasi aktif" : "Aktifkan notifikasi"
+              }
+              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted active:bg-void-raised disabled:opacity-100"
+            >
+              <BellIcon status={notifStatus} />
+            </button>
+            {!isStandalone && (
+              <button
+                onClick={handleInstallTap}
+                aria-label="Install ke perangkat"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted active:bg-void-raised"
+              >
+                <InstallIcon />
+              </button>
+            )}
+          </div>
         </div>
-        <StatusBadge status={conversation.status} />
+
+        <div className="-mt-1 flex flex-col items-center gap-1 pb-0.5">
+          <p
+            className={`${handleFont.className} text-lg font-bold tracking-tight`}
+            style={{ color: ACCENT_TURQUOISE }}
+          >
+            @{username}
+          </p>
+          <StatusBadge status={conversation.status} />
+        </div>
       </header>
 
       <div
@@ -231,6 +424,20 @@ export default function ChatRoomPage() {
       </div>
 
       <ChatComposer onSend={handleSend} disabled={chatLocked} />
+
+      {showNotifHelp && (
+        <NotificationPermissionHelp
+          onClose={() => setShowNotifHelp(false)}
+          onRetry={() => {
+            setShowNotifHelp(false);
+            handleEnableNotifications();
+          }}
+        />
+      )}
+
+      {showInstallHelp && (
+        <InstallHelpModal isIOS={isIOS} onClose={() => setShowInstallHelp(false)} />
+      )}
     </main>
   );
 }
