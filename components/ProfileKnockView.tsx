@@ -188,7 +188,7 @@ export function ProfileKnockView({
 
   if (state === "loading") {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-void">
+      <main className="zone-backdrop flex min-h-dvh items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-haze border-t-transparent" />
       </main>
     );
@@ -196,7 +196,18 @@ export function ProfileKnockView({
 
   if (state === "not-found") {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-2 bg-void px-6 text-center">
+      <main className="zone-backdrop flex min-h-dvh flex-col items-center justify-center gap-2 px-6 text-center safe-top safe-bottom">
+        <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-void-line bg-void-raised">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"
+              stroke="#5B6472"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+            <path d="M9.5 12l2 2 3.5-4" stroke="#5B6472" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
         <p className="text-lg font-semibold text-ink">Zona tidak ditemukan</p>
         <p className="text-sm text-ink-muted">
           {username
@@ -209,7 +220,15 @@ export function ProfileKnockView({
 
   if (state === "error") {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-2 bg-void px-6 text-center">
+      <main className="zone-backdrop flex min-h-dvh flex-col items-center justify-center gap-2 px-6 text-center safe-top safe-bottom">
+        <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-void-line bg-void-raised">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 3C9 3 7 5.5 7 8.5V11H6a1 1 0 00-1 1v7a2 2 0 002 2h10a2 2 0 002-2v-7a1 1 0 00-1-1h-1V8.5C17 5.5 15 3 12 3zm3 8H9V8.5C9 6.6 10.3 5 12 5s3 1.6 3 3.5V11z"
+              fill="#5B6472"
+            />
+          </svg>
+        </div>
         <p className="text-lg font-semibold text-ink">Terjadi kendala</p>
         <p className="text-sm text-ink-muted">
           Tidak bisa memuat profil ini sekarang. Muat ulang halaman.
@@ -224,22 +243,18 @@ export function ProfileKnockView({
     <main className="zone-backdrop flex min-h-dvh flex-col px-6 safe-top safe-bottom">
       <div className="flex flex-1 flex-col items-center justify-center">
         {showWelcome && (
-          <div className="mb-8 flex flex-col items-center text-center">
-            <div className="relative h-16 w-16">
-              <Image
-                src="/logo/sam-zone-icon.png"
-                alt="Sam-Zone"
-                fill
-                priority
-                className="object-contain drop-shadow-[0_0_20px_rgba(56,189,248,0.35)]"
-              />
-            </div>
-            <p className="mt-3 font-mark text-2xl leading-none text-ink">
-              Selamat datang di <span className="text-haze">Sam&#8209;Zone</span>
-            </p>
-            <p className="mt-2 max-w-[15rem] text-xs leading-relaxed text-ink-muted">
-              Tulis keperluanmu, lalu ketuk pintu. Sam meninjau dan chat
-              terbuka otomatis begitu disetujui.
+          <div className="mb-6 w-full max-w-[240px] animate-rise-in">
+            <Image
+              src="/logo/sam-zone-hero.png"
+              alt="Selamat datang di Sam-Zone — Public Chat"
+              width={719}
+              height={575}
+              priority
+              className="h-auto w-full object-contain drop-shadow-[0_0_28px_rgba(56,189,248,0.28)]"
+            />
+            <p className="mt-1 text-center text-xs leading-relaxed text-ink-muted">
+              Tulis keperluanmu, ketuk pintu — chat terbuka otomatis begitu
+              Sam menyetujui.
             </p>
           </div>
         )}
@@ -248,7 +263,7 @@ export function ProfileKnockView({
           src={profile.foto_url}
           alt={profile.username}
           online={profile.status_online}
-          size={112}
+          size={showWelcome ? 88 : 120}
         />
         <h1 className="mt-4 text-xl font-semibold text-ink">
           @{profile.username}
@@ -258,9 +273,14 @@ export function ProfileKnockView({
             {profile.deskripsi}
           </p>
         )}
-        <p className="mt-3 text-xs text-ink-faint">
-          {profile.status_online ? "Sedang online" : "Sedang offline"}
-        </p>
+        <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-void-line bg-void-raised px-3 py-1 text-xs text-ink-muted">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              profile.status_online ? "bg-signal-approved" : "bg-ink-faint"
+            }`}
+          />
+          {profile.status_online ? "Sedang berjaga" : "Sedang tidak ada"}
+        </span>
 
         {conversation && (
           <div className="mt-5">
@@ -271,13 +291,16 @@ export function ProfileKnockView({
 
       <div className="pb-8">
         {!conversation && (
-          <div className="space-y-3">
+          <div className="relative animate-rise-in space-y-3 rounded-3xl border border-void-line bg-void-raised/60 p-4 pt-5 backdrop-blur-sm">
+            {/* Light seeping in under the door — the one structural flourish on this card */}
+            <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-haze/70 to-transparent" />
+
             <textarea
               value={keperluan}
               onChange={(e) => setKeperluan(e.target.value)}
               placeholder="Tulis keperluanmu singkat (opsional) — membantu Sam memutuskan lebih cepat"
               rows={2}
-              className="w-full resize-none rounded-2xl border border-void-line bg-void-raised px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:border-haze/60"
+              className="w-full resize-none rounded-2xl border border-void-line bg-void/70 px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:border-haze/60"
             />
 
             {showAccessCode ? (
@@ -285,7 +308,7 @@ export function ProfileKnockView({
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value)}
                 placeholder="Kode akses"
-                className="w-full rounded-2xl border border-void-line bg-void-raised px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:border-haze/60"
+                className="w-full rounded-2xl border border-void-line bg-void/70 px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:border-haze/60"
               />
             ) : (
               <button
