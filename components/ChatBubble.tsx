@@ -61,7 +61,8 @@ export function ChatBubble({
   isMine: boolean;
   tickStatus?: TickStatus;
 }) {
-  const time = new Date(message.created_at).toLocaleTimeString("id-ID", {
+  const sentAt = new Date(message.created_at);
+  const time = sentAt.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -69,7 +70,7 @@ export function ChatBubble({
   return (
     <div className={`flex w-full ${isMine ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[78%] animate-rise-in rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${
+        className={`max-w-[78%] motion-safe:animate-rise-in rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${
           isMine
             ? "rounded-br-md bg-haze text-void"
             : "rounded-bl-md border border-void-line bg-void-raised text-ink"
@@ -81,7 +82,7 @@ export function ChatBubble({
             isMine ? "text-void/60" : "text-ink-faint"
           }`}
         >
-          {time}
+          <time dateTime={sentAt.toISOString()}>{time}</time>
           {isMine && <StatusTicks status={tickStatus ?? null} />}
         </span>
       </div>
