@@ -66,4 +66,4 @@ function InstallPromptComponent() {
 
 export const InstallPrompt = InstallPromptComponent;
 
-export default InstallPromptComponent;
+export default InstallPromptComponent;  
