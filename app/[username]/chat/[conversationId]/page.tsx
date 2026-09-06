@@ -21,7 +21,7 @@ type ViewState = "loading" | "ready" | "denied" | "error";
 // Font berbeda khusus untuk handle "@username" di header — sengaja dipisah
 // dari font utama app supaya identitas Sam menonjol di titik yang paling
 // sering dilihat (header selalu ada di layar).
-const handleFont = Space_Grotesk({ subsets: ["latin"], weight: ["700"] });
+const handleFont = Space_Grotesk({ subsets: ["latin"], weight: ["600", "700"] });
 
 // Sama dengan READ_TICK_COLOR di ChatBubble.tsx — dipakai lagi di sini
 // supaya biru tosca jadi warna aksen yang konsisten, bukan warna sekali pakai.
@@ -34,25 +34,77 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+// Ring fokus keyboard yang konsisten dipakai di semua tombol interaktif —
+// disatukan jadi satu konstanta supaya tidak ada tombol yang "lupa" diberi
+// state fokus (a11y).
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-void";
+
+/** Inisial dari @username, dipakai sebagai monogram avatar di header. */
+function getInitials(name: string) {
+  const clean = name.trim();
+  if (!clean) return "?";
+  return clean.slice(0, 2).toUpperCase();
+}
+
 function BellIcon({ status }: { status: NotifStatus }) {
   const color = status === "granted" ? "#34D399" : "#F5B942";
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
-        d="M12 3C9 3 7 5.5 7 8.5V11H6a1 1 0 00-1 1v7a2 2 0 002 2h10a2 2 0 002-2v-7a1 1 0 00-1-1h-1V8.5C17 5.5 15 3 12 3zm3 8H9V8.5C9 6.6 10.3 5 12 5s3 1.6 3 3.5V11z"
-        fill={color}
+        d="M12 4a5 5 0 0 0-5 5v2.3c0 1-.32 1.98-.9 2.79L5 16h14l-1.1-1.91a4.9 4.9 0 0 1-.9-2.79V9a5 5 0 0 0-5-5Z"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
       />
+      <path
+        d="M9.5 18.5a2.5 2.5 0 0 0 5 0"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      {status === "granted" && <circle cx="18.2" cy="5.8" r="2.6" fill={color} />}
     </svg>
   );
 }
 
 function InstallIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-      <rect x="4" y="3.5" width="16" height="13" rx="2" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M9 20h6M12 16v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M9 9l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 5.5v6.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="3.5" width="16" height="13" rx="2.2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M9 20h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M12 6.2v5.6m0 0 2.4-2.4M12 11.8 9.6 9.4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="5" y="10.5" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M12 14.2v2.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 4.5 21 19H3L12 4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M12 10v3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="12" cy="16.3" r="0.9" fill="currentColor" />
     </svg>
   );
 }
@@ -71,27 +123,34 @@ function InstallHelpModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="install-help-title"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+    >
       <div className="w-full max-w-sm rounded-t-3xl border border-void-line bg-void-raised p-5 sm:rounded-3xl">
-        <p className="text-sm font-semibold text-ink">Install ke perangkat</p>
+        <p id="install-help-title" className="text-sm font-semibold text-ink">
+          Install ke perangkat
+        </p>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
           {isIOS ? (
             <>
-              Di Safari: tap ikon <strong>Share</strong> (kotak dengan panah ke
+              Di Safari, tap ikon <strong>Share</strong> (kotak dengan panah ke
               atas) di bar bawah, lalu pilih{" "}
               <strong>&quot;Add to Home Screen&quot;</strong>.
             </>
           ) : (
             <>
-              Buka menu browser (biasanya ikon titik tiga di pojok), lalu
-              cari opsi <strong>&quot;Install app&quot;</strong> atau{" "}
+              Buka menu browser (ikon titik tiga di pojok), lalu pilih{" "}
+              <strong>&quot;Install app&quot;</strong> atau{" "}
               <strong>&quot;Add to Home screen&quot;</strong>.
             </>
           )}
         </p>
         <button
           onClick={onClose}
-          className="mt-4 w-full rounded-xl border border-void-line py-2.5 text-sm font-medium text-ink-muted active:bg-void"
+          className={`mt-4 w-full rounded-xl border border-void-line py-2.5 text-sm font-medium text-ink-muted transition-colors active:bg-void ${FOCUS_RING}`}
         >
           Mengerti
         </button>
@@ -125,6 +184,10 @@ export default function ChatRoomPage() {
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
 
+  // Satu momen transisi yang disengaja saat header muncul pertama kali —
+  // dihormati prefers-reduced-motion lewat prefix motion-safe.
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
     setNotifStatus(getNotificationPermissionState());
 
@@ -133,6 +196,8 @@ export default function ChatRoomPage() {
         (window.navigator as unknown as { standalone?: boolean }).standalone === true
     );
     setIsIOS(/iphone|ipad|ipod/i.test(window.navigator.userAgent));
+
+    const frame = requestAnimationFrame(() => setMounted(true));
 
     function onBeforeInstallPrompt(e: Event) {
       e.preventDefault();
@@ -146,6 +211,7 @@ export default function ChatRoomPage() {
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
     };
@@ -315,25 +381,35 @@ export default function ChatRoomPage() {
   if (state === "loading") {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-void">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-haze border-t-transparent" />
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label="Memuat percakapan"
+          className="h-7 w-7 animate-spin rounded-full border-2 border-haze border-t-transparent"
+        />
       </main>
     );
   }
 
   if (state === "denied" || state === "error") {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-void px-6 text-center">
-        <p className="text-lg font-semibold text-ink">
-          {state === "denied" ? "Chat tidak tersedia" : "Terjadi kendala"}
-        </p>
-        <p className="text-sm text-ink-muted">
-          {state === "denied"
-            ? "Percakapan ini belum disetujui, sudah ditutup, atau bukan milikmu."
-            : "Tidak bisa memuat chat ini sekarang."}
-        </p>
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-void px-6 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-void-line bg-void-raised text-ink-muted">
+          {state === "denied" ? <LockIcon /> : <AlertIcon />}
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-lg font-semibold text-ink">
+            {state === "denied" ? "Chat tidak tersedia" : "Terjadi kendala"}
+          </p>
+          <p className="max-w-[26ch] text-sm text-ink-muted">
+            {state === "denied"
+              ? "Percakapan ini belum disetujui, sudah ditutup, atau bukan milikmu."
+              : "Tidak bisa memuat chat ini sekarang."}
+          </p>
+        </div>
         <button
           onClick={() => router.push(`/${username}`)}
-          className="mt-2 rounded-xl border border-void-line px-4 py-2 text-sm text-ink-muted"
+          className={`mt-1 rounded-xl border border-void-line px-4 py-2 text-sm text-ink-muted transition-colors active:bg-void-raised ${FOCUS_RING}`}
         >
           Kembali ke profil
         </button>
@@ -344,17 +420,22 @@ export default function ChatRoomPage() {
   if (!conversation || !visitor) return null;
 
   const chatLocked = conversation.status !== "APPROVED";
+  const bellDim = notifBusy || notifStatus === "unsupported";
 
   return (
     <main className="flex min-h-dvh flex-col bg-void">
-      <header className="safe-top border-b border-void-line px-4 pb-3">
+      <header
+        className={`safe-top border-b border-void-line px-4 pb-4 transition-opacity motion-safe:duration-500 motion-safe:ease-out ${
+          mounted ? "opacity-100" : "opacity-0"
+        }`}
+      >
         <div className="flex items-center justify-between pt-1">
           <button
             onClick={() => router.push(`/${username}`)}
             aria-label="Kembali"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted active:bg-void-raised"
+            className={`flex h-9 w-9 items-center justify-center rounded-full text-ink-muted transition-colors active:bg-void-raised ${FOCUS_RING}`}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
                 d="M15 18l-6-6 6-6"
                 stroke="currentColor"
@@ -372,7 +453,9 @@ export default function ChatRoomPage() {
               aria-label={
                 notifStatus === "granted" ? "Notifikasi aktif" : "Aktifkan notifikasi"
               }
-              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted active:bg-void-raised disabled:opacity-100"
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-ink-muted transition-colors active:bg-void-raised disabled:active:bg-transparent ${
+                bellDim ? "opacity-40" : "opacity-100"
+              } ${FOCUS_RING}`}
             >
               <BellIcon status={notifStatus} />
             </button>
@@ -380,7 +463,7 @@ export default function ChatRoomPage() {
               <button
                 onClick={handleInstallTap}
                 aria-label="Install ke perangkat"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-ink-muted active:bg-void-raised"
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-ink-muted transition-colors active:bg-void-raised ${FOCUS_RING}`}
               >
                 <InstallIcon />
               </button>
@@ -388,14 +471,28 @@ export default function ChatRoomPage() {
           </div>
         </div>
 
-        <div className="-mt-1 flex flex-col items-center gap-1 pb-0.5">
-          <p
-            className={`${handleFont.className} text-lg font-bold tracking-tight`}
-            style={{ color: ACCENT_TURQUOISE }}
+        <div className="mt-3 flex flex-col items-center gap-2">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-full border text-sm font-semibold"
+            style={{
+              borderColor: `${ACCENT_TURQUOISE}4D`,
+              backgroundColor: `${ACCENT_TURQUOISE}1A`,
+              color: ACCENT_TURQUOISE,
+            }}
+            aria-hidden="true"
           >
-            @{username}
-          </p>
-          <StatusBadge status={conversation.status} />
+            <span className={handleFont.className}>{getInitials(username)}</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1">
+            <p
+              className={`${handleFont.className} text-lg font-bold tracking-tight`}
+              style={{ color: ACCENT_TURQUOISE }}
+            >
+              @{username}
+            </p>
+            <StatusBadge status={conversation.status} />
+          </div>
         </div>
       </header>
 
@@ -404,8 +501,8 @@ export default function ChatRoomPage() {
         className="no-scrollbar flex-1 space-y-2 overflow-y-auto px-4 py-4"
       >
         {messages.length === 0 && (
-          <p className="pt-10 text-center text-xs text-ink-faint">
-            Belum ada pesan. Mulai percakapan.
+          <p className="mx-auto max-w-[24ch] pt-10 text-center text-xs text-ink-faint">
+            Belum ada pesan. Kirim pesan pertama untuk memulai percakapan.
           </p>
         )}
         {messages.map((m) => (
