@@ -4,7 +4,10 @@ import { useInstallPrompt } from "@/components/useInstallPrompt";
 import { useEffect, useState } from "react";
 
 function InstallPromptComponent() {
-  const { isInstallable, install } = useInstallPrompt();
+  const {
+    canInstall,
+    promptInstall,
+  } = useInstallPrompt();
 
   const [visible, setVisible] = useState(false);
 
@@ -12,7 +15,7 @@ function InstallPromptComponent() {
     setVisible(true);
   }, []);
 
-  if (!visible || !isInstallable) {
+  if (!visible || !canInstall) {
     return null;
   }
 
@@ -35,6 +38,7 @@ function InstallPromptComponent() {
       "
     >
       <div className="flex items-center justify-between gap-3">
+
         <div>
           <h3 className="text-sm font-semibold text-white">
             Install Sky Zone App
@@ -46,7 +50,7 @@ function InstallPromptComponent() {
         </div>
 
         <button
-          onClick={install}
+          onClick={promptInstall}
           className="
             rounded-xl
             bg-blue-600
@@ -55,10 +59,13 @@ function InstallPromptComponent() {
             text-xs
             font-semibold
             text-white
+            hover:bg-blue-700
+            transition
           "
         >
           Install
         </button>
+
       </div>
     </div>
   );
@@ -66,4 +73,4 @@ function InstallPromptComponent() {
 
 export const InstallPrompt = InstallPromptComponent;
 
-export default InstallPromptComponent;  
+export default InstallPromptComponent;
