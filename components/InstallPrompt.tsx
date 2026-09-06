@@ -3,7 +3,7 @@
 import { useInstallPrompt } from "@/components/useInstallPrompt";
 import { useEffect, useState } from "react";
 
-export function InstallPrompt() {
+function InstallPromptComponent() {
   const { isInstallable, install } = useInstallPrompt();
 
   const [visible, setVisible] = useState(false);
@@ -55,8 +55,6 @@ export function InstallPrompt() {
             text-xs
             font-semibold
             text-white
-            hover:bg-blue-700
-            transition
           "
         >
           Install
@@ -65,3 +63,7 @@ export function InstallPrompt() {
     </div>
   );
 }
+
+export const InstallPrompt = InstallPromptComponent;
+
+export default InstallPromptComponent;
