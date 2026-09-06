@@ -14,9 +14,23 @@ import {
   getNotificationPermissionState,
 } from "@/lib/push";
 import { markDelivered, markRead, getTickStatus } from "@/lib/messageStatus";
-import type { AppUser, Conversation, Message } from "@/lib/types";
+import type {
+  AppUser,
+  Conversation,
+  ConversationStatus,
+  Message,
+} from "@/lib/types";
 
 type ViewState = "loading" | "ready" | "denied" | "error";
+
+// Selaras dengan copy di StatusBadge.tsx: status non-APPROVED mengunci
+// composer, jadi setiap status itu (bukan cuma CLOSED) perlu keterangan
+// kenapa input tidak bisa dipakai.
+const LOCK_NOTICE: Partial<Record<ConversationStatus, string>> = {
+  PENDING: "Menunggu persetujuan sebelum bisa membalas.",
+  REJECTED: "Permintaan chat ini tidak disetujui.",
+  CLOSED: "Percakapan ini telah ditutup.",
+};
 
 // Font berbeda khusus untuk handle "@username" di header — sengaja dipisah
 // dari font utama app supaya identitas Sam menonjol di titik yang paling
@@ -184,10 +198,6 @@ export default function ChatRoomPage() {
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
 
-  // Satu momen transisi yang disengaja saat header muncul pertama kali —
-  // dihormati prefers-reduced-motion lewat prefix motion-safe.
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
     setNotifStatus(getNotificationPermissionState());
 
@@ -196,8 +206,6 @@ export default function ChatRoomPage() {
         (window.navigator as unknown as { standalone?: boolean }).standalone === true
     );
     setIsIOS(/iphone|ipad|ipod/i.test(window.navigator.userAgent));
-
-    const frame = requestAnimationFrame(() => setMounted(true));
 
     function onBeforeInstallPrompt(e: Event) {
       e.preventDefault();
@@ -211,7 +219,6 @@ export default function ChatRoomPage() {
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
     return () => {
-      cancelAnimationFrame(frame);
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
     };
@@ -424,11 +431,7 @@ export default function ChatRoomPage() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-void">
-      <header
-        className={`safe-top border-b border-void-line px-4 pb-4 transition-opacity motion-safe:duration-500 motion-safe:ease-out ${
-          mounted ? "opacity-100" : "opacity-0"
-        }`}
-      >
+      <header className="safe-top motion-safe:animate-rise-in border-b border-void-line px-4 pb-4">
         <div className="flex items-center justify-between pt-1">
           <button
             onClick={() => router.push(`/${username}`)}
@@ -513,9 +516,9 @@ export default function ChatRoomPage() {
             tickStatus={getTickStatus(m, visitor.id)}
           />
         ))}
-        {conversation.status === "CLOSED" && (
+        {chatLocked && LOCK_NOTICE[conversation.status] && (
           <p className="pt-2 text-center text-xs text-ink-faint">
-            Percakapan ini telah ditutup.
+            {LOCK_NOTICE[conversation.status]}
           </p>
         )}
       </div>
