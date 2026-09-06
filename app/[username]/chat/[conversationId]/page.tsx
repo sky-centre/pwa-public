@@ -431,12 +431,13 @@ export default function ChatRoomPage() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-void">
-      <header className="safe-top motion-safe:animate-rise-in border-b border-void-line px-4 pb-4">
+      <header className="safe-top motion-safe:animate-rise-in px-4 pb-1 pt-3">
+        <div className="rounded-[28px] border border-white/10 bg-white/[0.05] px-4 pb-5 pt-1 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
         <div className="flex items-center justify-between pt-1">
           <button
             onClick={() => router.push(`/${username}`)}
             aria-label="Kembali"
-            className={`flex h-9 w-9 items-center justify-center rounded-full text-ink-muted transition-colors active:bg-void-raised ${FOCUS_RING}`}
+            className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-ink-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors active:bg-white/10 ${FOCUS_RING}`}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
@@ -456,7 +457,7 @@ export default function ChatRoomPage() {
               aria-label={
                 notifStatus === "granted" ? "Notifikasi aktif" : "Aktifkan notifikasi"
               }
-              className={`flex h-9 w-9 items-center justify-center rounded-full text-ink-muted transition-colors active:bg-void-raised disabled:active:bg-transparent ${
+              className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-ink-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors active:bg-white/10 disabled:active:bg-white/5 ${
                 bellDim ? "opacity-40" : "opacity-100"
               } ${FOCUS_RING}`}
             >
@@ -466,7 +467,7 @@ export default function ChatRoomPage() {
               <button
                 onClick={handleInstallTap}
                 aria-label="Install ke perangkat"
-                className={`flex h-9 w-9 items-center justify-center rounded-full text-ink-muted transition-colors active:bg-void-raised ${FOCUS_RING}`}
+                className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-ink-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-colors active:bg-white/10 ${FOCUS_RING}`}
               >
                 <InstallIcon />
               </button>
@@ -476,11 +477,12 @@ export default function ChatRoomPage() {
 
         <div className="mt-3 flex flex-col items-center gap-2">
           <div
-            className="flex h-12 w-12 items-center justify-center rounded-full border text-sm font-semibold"
+            className="flex h-14 w-14 items-center justify-center rounded-full border-[1.5px] text-base font-semibold"
             style={{
-              borderColor: `${ACCENT_TURQUOISE}4D`,
+              borderColor: `${ACCENT_TURQUOISE}73`,
               backgroundColor: `${ACCENT_TURQUOISE}1A`,
               color: ACCENT_TURQUOISE,
+              boxShadow: `0 0 26px ${ACCENT_TURQUOISE}47, inset 0 0 14px ${ACCENT_TURQUOISE}1F`,
             }}
             aria-hidden="true"
           >
@@ -489,19 +491,23 @@ export default function ChatRoomPage() {
 
           <div className="flex flex-col items-center gap-1">
             <p
-              className={`${handleFont.className} text-lg font-bold tracking-tight`}
-              style={{ color: ACCENT_TURQUOISE }}
+              className={`${handleFont.className} text-xl font-bold tracking-tight`}
+              style={{
+                color: ACCENT_TURQUOISE,
+                textShadow: `0 0 22px ${ACCENT_TURQUOISE}59`,
+              }}
             >
               @{username}
             </p>
             <StatusBadge status={conversation.status} />
           </div>
         </div>
+        </div>
       </header>
 
       <div
         ref={scrollRef}
-        className="no-scrollbar flex-1 space-y-2 overflow-y-auto px-4 py-4"
+        className="no-scrollbar flex-1 space-y-2.5 overflow-y-auto px-4 py-5"
       >
         {messages.length === 0 && (
           <p className="mx-auto max-w-[24ch] pt-10 text-center text-xs text-ink-faint">
