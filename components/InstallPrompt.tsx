@@ -3,7 +3,7 @@
 import { useInstallPrompt } from "@/components/useInstallPrompt";
 import { useEffect, useState } from "react";
 
-export default function InstallPrompt() {
+export function InstallPrompt() {
   const { isInstallable, install } = useInstallPrompt();
 
   const [visible, setVisible] = useState(false);
