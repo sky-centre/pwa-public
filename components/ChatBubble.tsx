@@ -11,7 +11,7 @@ function StatusTicks({ status }: { status: TickStatus }) {
 
   const isRead = status === "read";
 
-  // sent/delivered: satu warna pudar (void/50), dibedakan lewat jumlah centang.
+  // sent/delivered: satu warna pudar, dibedakan lewat jumlah centang.
   // read: warna solid biru tosca terang — beda warna sekaligus beda opacity,
   // supaya "sudah dibaca" jelas menonjol dari kedua status lainnya.
   const opacityClass = isRead ? "opacity-100" : "opacity-50";
@@ -22,7 +22,7 @@ function StatusTicks({ status }: { status: TickStatus }) {
       height="10"
       viewBox="0 0 15 10"
       fill="none"
-      className={`inline-block shrink-0 ${isRead ? "" : "text-void"} ${opacityClass}`}
+      className={`inline-block shrink-0 ${isRead ? "" : "text-[#04121F]"} ${opacityClass}`}
       style={isRead ? { color: READ_TICK_COLOR } : undefined}
       aria-label={
         status === "sent"
@@ -61,8 +61,7 @@ export function ChatBubble({
   isMine: boolean;
   tickStatus?: TickStatus;
 }) {
-  const sentAt = new Date(message.created_at);
-  const time = sentAt.toLocaleTimeString("id-ID", {
+  const time = new Date(message.created_at).toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -70,19 +69,19 @@ export function ChatBubble({
   return (
     <div className={`flex w-full ${isMine ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[78%] motion-safe:animate-rise-in rounded-2xl px-4 py-2.5 text-[15px] leading-snug ${
+        className={`max-w-[78%] animate-rise-in px-4 py-2.5 text-[15px] leading-snug ${
           isMine
-            ? "rounded-br-md bg-haze text-void"
-            : "rounded-bl-md border border-void-line bg-void-raised text-ink"
+            ? "rounded-2xl rounded-br-md bg-gradient-to-br from-sky-300 via-sky-400 to-sky-500 text-[#04121F] shadow-[0_14px_34px_-10px_rgba(14,165,233,0.45),0_4px_14px_-6px_rgba(14,165,233,0.35),inset_0_1px_0_rgba(255,255,255,0.35)]"
+            : "rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.05] text-ink shadow-[0_12px_28px_-14px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl"
         }`}
       >
         <p className="whitespace-pre-wrap break-words">{message.isi_pesan}</p>
         <span
           className={`mt-1 flex items-center justify-end gap-1 text-[11px] ${
-            isMine ? "text-void/60" : "text-ink-faint"
+            isMine ? "text-[#04121F]/60" : "text-ink-faint"
           }`}
         >
-          <time dateTime={sentAt.toISOString()}>{time}</time>
+          {time}
           {isMine && <StatusTicks status={tickStatus ?? null} />}
         </span>
       </div>
